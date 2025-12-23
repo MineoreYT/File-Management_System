@@ -1,4 +1,5 @@
 const database = require('../config/database');
+const validator = require('validator');
 const fs = require('fs');
 const path = require('path');
 
@@ -103,6 +104,21 @@ const getFiles = (req, res) => {
     const sortBy = req.query.sortBy || 'name';
     const sortOrder = req.query.sortOrder || 'ASC';
 
+    // Validate and sanitize inputs
+    if (folderId && !validator.isInt(String(folderId), { min: 1 })) {
+        return res.status(400).json({ error: 'Invalid folder ID' });
+    }
+
+    // Sanitize search query
+    const sanitizedSearch = search ? validator.escape(search.trim()) : null;
+    
+    // Validate sort parameters
+    const validSortColumns = ['name', 'original_name', 'file_size', 'created_at'];
+    const validSortOrders = ['ASC', 'DESC'];
+    
+    const safeSortBy = validSortColumns.includes(sortBy) ? sortBy : 'name';
+    const safeSortOrder = validSortOrders.includes(sortOrder.toUpperCase()) ? sortOrder.toUpperCase() : 'ASC';
+
     const db = database.getDb();
     
     let query = 'SELECT * FROM files WHERE user_id = ?';
@@ -115,20 +131,13 @@ const getFiles = (req, res) => {
         query += ' AND folder_id IS NULL';
     }
 
-    if (search) {
+    if (sanitizedSearch) {
         query += ' AND (original_name LIKE ? OR name LIKE ?)';
-        params.push(`%${search}%`, `%${search}%`);
+        params.push(`%${sanitizedSearch}%`, `%${sanitizedSearch}%`);
     }
 
-    // Add sorting
-    const validSortColumns = ['name', 'original_name', 'file_size', 'created_at'];
-    const validSortOrders = ['ASC', 'DESC'];
-    
-    if (validSortColumns.includes(sortBy) && validSortOrders.includes(sortOrder.toUpperCase())) {
-        query += ` ORDER BY ${sortBy} ${sortOrder.toUpperCase()}`;
-    } else {
-        query += ' ORDER BY name ASC';
-    }
+    // Add sorting with validated parameters
+    query += ` ORDER BY ${safeSortBy} ${safeSortOrder}`;
 
     db.all(query, params, (err, files) => {
         if (err) {
@@ -214,8 +223,24 @@ const renameFile = (req, res) => {
     const { name } = req.body;
     const userId = req.user.id;
 
-    if (!name) {
-        return res.status(400).json({ error: 'File name is required' });
+    // Validate input
+    if (!name || typeof name !== 'string') {
+        return res.status(400).json({ error: 'File name is required and must be a string' });
+    }
+
+    // Sanitize and validate file name
+    const sanitizedName = validator.escape(name.trim());
+    
+    // Check for valid filename (no path traversal, special chars)
+    if (!/^[a-zA-Z0-9._\-\s()]+$/.test(sanitizedName) || sanitizedName.length > 255) {
+        return res.status(400).json({ 
+            error: 'Invalid file name. Use only letters, numbers, spaces, dots, hyphens, underscores, and parentheses. Max 255 characters.' 
+        });
+    }
+
+    // Validate ID parameter
+    if (!validator.isInt(id, { min: 1 })) {
+        return res.status(400).json({ error: 'Invalid file ID' });
     }
 
     const db = database.getDb();
@@ -229,14 +254,15 @@ const renameFile = (req, res) => {
         }
 
         db.run('UPDATE files SET original_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-            [name, id], function(err) {
+            [sanitizedName, id], function(err) {
             if (err) {
+                console.error('Error renaming file:', err);
                 return res.status(500).json({ error: 'Failed to rename file' });
             }
 
             res.json({
                 message: 'File renamed successfully',
-                file: { ...file, original_name: name }
+                file: { ...file, original_name: sanitizedName }
             });
         });
     });
@@ -246,6 +272,16 @@ const moveFile = (req, res) => {
     const { id } = req.params;
     const { folderId } = req.body;
     const userId = req.user.id;
+
+    // Validate ID parameter
+    if (!validator.isInt(id, { min: 1 })) {
+        return res.status(400).json({ error: 'Invalid file ID' });
+    }
+
+    // Validate folderId if provided
+    if (folderId !== null && folderId !== undefined && !validator.isInt(String(folderId), { min: 1 })) {
+        return res.status(400).json({ error: 'Invalid folder ID' });
+    }
 
     const db = database.getDb();
 

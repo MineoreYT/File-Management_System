@@ -1,12 +1,29 @@
 const database = require('../config/database');
+const validator = require('validator');
 const path = require('path');
 
 const createFolder = (req, res) => {
     const { name, parentId } = req.body;
     const userId = req.user.id;
 
-    if (!name) {
-        return res.status(400).json({ error: 'Folder name is required' });
+    // Validate input
+    if (!name || typeof name !== 'string') {
+        return res.status(400).json({ error: 'Folder name is required and must be a string' });
+    }
+
+    // Sanitize and validate folder name
+    const sanitizedName = validator.escape(name.trim());
+    
+    // Check for valid folder name (no path traversal, special chars)
+    if (!/^[a-zA-Z0-9._\-\s()]+$/.test(sanitizedName) || sanitizedName.length > 100) {
+        return res.status(400).json({ 
+            error: 'Invalid folder name. Use only letters, numbers, spaces, dots, hyphens, underscores, and parentheses. Max 100 characters.' 
+        });
+    }
+
+    // Validate parentId if provided
+    if (parentId !== null && parentId !== undefined && !validator.isInt(String(parentId), { min: 1 })) {
+        return res.status(400).json({ error: 'Invalid parent folder ID' });
     }
 
     const db = database.getDb();
@@ -22,13 +39,13 @@ const createFolder = (req, res) => {
                 return res.status(404).json({ error: 'Parent folder not found' });
             }
 
-            const folderPath = path.posix.join(parentFolder.path, name);
-            insertFolder(name, parentId, userId, folderPath, res);
+            const folderPath = path.posix.join(parentFolder.path, sanitizedName);
+            insertFolder(sanitizedName, parentId, userId, folderPath, res);
         });
     } else {
         // Create in root
-        const folderPath = `/${name}`;
-        insertFolder(name, null, userId, folderPath, res);
+        const folderPath = `/${sanitizedName}`;
+        insertFolder(sanitizedName, null, userId, folderPath, res);
     }
 };
 
@@ -129,8 +146,24 @@ const renameFolder = (req, res) => {
     const { name } = req.body;
     const userId = req.user.id;
 
-    if (!name) {
-        return res.status(400).json({ error: 'Folder name is required' });
+    // Validate input
+    if (!name || typeof name !== 'string') {
+        return res.status(400).json({ error: 'Folder name is required and must be a string' });
+    }
+
+    // Sanitize and validate folder name
+    const sanitizedName = validator.escape(name.trim());
+    
+    // Check for valid folder name
+    if (!/^[a-zA-Z0-9._\-\s()]+$/.test(sanitizedName) || sanitizedName.length > 100) {
+        return res.status(400).json({ 
+            error: 'Invalid folder name. Use only letters, numbers, spaces, dots, hyphens, underscores, and parentheses. Max 100 characters.' 
+        });
+    }
+
+    // Validate ID parameter
+    if (!validator.isInt(id, { min: 1 })) {
+        return res.status(400).json({ error: 'Invalid folder ID' });
     }
 
     const db = database.getDb();
@@ -146,8 +179,9 @@ const renameFolder = (req, res) => {
 
         // Check if new name conflicts with existing folders
         db.get('SELECT id FROM folders WHERE name = ? AND parent_id = ? AND user_id = ? AND id != ?',
-            [name, folder.parent_id, userId, id], (err, existingFolder) => {
+            [sanitizedName, folder.parent_id, userId, id], (err, existingFolder) => {
             if (err) {
+                console.error('Database error checking folder name conflict:', err);
                 return res.status(500).json({ error: 'Database error' });
             }
             if (existingFolder) {
@@ -157,12 +191,13 @@ const renameFolder = (req, res) => {
             // Update folder name and path
             const oldPath = folder.path;
             const newPath = folder.parent_id ? 
-                path.posix.join(path.dirname(oldPath), name) : 
-                `/${name}`;
+                path.posix.join(path.dirname(oldPath), sanitizedName) : 
+                `/${sanitizedName}`;
 
             db.run('UPDATE folders SET name = ?, path = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-                [name, newPath, id], function(err) {
+                [sanitizedName, newPath, id], function(err) {
                 if (err) {
+                    console.error('Error renaming folder:', err);
                     return res.status(500).json({ error: 'Failed to rename folder' });
                 }
 
@@ -171,7 +206,7 @@ const renameFolder = (req, res) => {
 
                 res.json({
                     message: 'Folder renamed successfully',
-                    folder: { ...folder, name, path: newPath }
+                    folder: { ...folder, name: sanitizedName, path: newPath }
                 });
             });
         });

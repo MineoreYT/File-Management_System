@@ -1,6 +1,34 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const validator = require('validator');
 const database = require('../config/database');
+
+// Password strength validation
+const validatePassword = (password) => {
+    const minLength = 8;
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumbers = /\d/.test(password);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+    
+    if (password.length < minLength) {
+        return 'Password must be at least 8 characters long';
+    }
+    if (!hasUpperCase) {
+        return 'Password must contain at least one uppercase letter';
+    }
+    if (!hasLowerCase) {
+        return 'Password must contain at least one lowercase letter';
+    }
+    if (!hasNumbers) {
+        return 'Password must contain at least one number';
+    }
+    if (!hasSpecialChar) {
+        return 'Password must contain at least one special character (!@#$%^&*(),.?":{}|<>)';
+    }
+    
+    return null; // Password is valid
+};
 
 const register = async (req, res) => {
     try {
@@ -11,16 +39,33 @@ const register = async (req, res) => {
             return res.status(400).json({ error: 'All fields are required' });
         }
 
-        if (password.length < 6) {
-            return res.status(400).json({ error: 'Password must be at least 6 characters' });
+        // Validate email format
+        if (!validator.isEmail(email)) {
+            return res.status(400).json({ error: 'Please provide a valid email address' });
         }
+
+        // Validate username (alphanumeric, 3-20 characters)
+        if (!validator.isAlphanumeric(username) || username.length < 3 || username.length > 20) {
+            return res.status(400).json({ error: 'Username must be 3-20 alphanumeric characters' });
+        }
+
+        // Validate password strength
+        const passwordError = validatePassword(password);
+        if (passwordError) {
+            return res.status(400).json({ error: passwordError });
+        }
+
+        // Sanitize inputs
+        const sanitizedUsername = validator.escape(username.trim());
+        const sanitizedEmail = validator.normalizeEmail(email.trim());
 
         const db = database.getDb();
 
         // Check if user already exists
         db.get('SELECT id FROM users WHERE username = ? OR email = ?', 
-            [username, email], async (err, existingUser) => {
+            [sanitizedUsername, sanitizedEmail], async (err, existingUser) => {
             if (err) {
+                console.error('Database error during registration:', err);
                 return res.status(500).json({ error: 'Database error' });
             }
 
@@ -28,20 +73,21 @@ const register = async (req, res) => {
                 return res.status(409).json({ error: 'Username or email already exists' });
             }
 
-            // Hash password
-            const saltRounds = 10;
+            // Hash password with higher salt rounds for better security
+            const saltRounds = 12;
             const hashedPassword = await bcrypt.hash(password, saltRounds);
 
             // Insert new user
             db.run('INSERT INTO users (username, email, password) VALUES (?, ?, ?)',
-                [username, email, hashedPassword], function(err) {
+                [sanitizedUsername, sanitizedEmail, hashedPassword], function(err) {
                 if (err) {
+                    console.error('Failed to create user:', err);
                     return res.status(500).json({ error: 'Failed to create user' });
                 }
 
                 // Generate JWT token
                 const token = jwt.sign(
-                    { userId: this.lastID, username },
+                    { userId: this.lastID, username: sanitizedUsername },
                     process.env.JWT_SECRET,
                     { expiresIn: '24h' }
                 );
@@ -51,8 +97,8 @@ const register = async (req, res) => {
                     token,
                     user: {
                         id: this.lastID,
-                        username,
-                        email
+                        username: sanitizedUsername,
+                        email: sanitizedEmail
                     }
                 });
             });
@@ -67,16 +113,21 @@ const login = async (req, res) => {
     try {
         const { username, password } = req.body;
 
+        // Validate input
         if (!username || !password) {
             return res.status(400).json({ error: 'Username and password are required' });
         }
+
+        // Sanitize username input
+        const sanitizedUsername = validator.escape(username.trim());
 
         const db = database.getDb();
 
         // Find user by username or email
         db.get('SELECT * FROM users WHERE username = ? OR email = ?', 
-            [username, username], async (err, user) => {
+            [sanitizedUsername, sanitizedUsername], async (err, user) => {
             if (err) {
+                console.error('Database error during login:', err);
                 return res.status(500).json({ error: 'Database error' });
             }
 

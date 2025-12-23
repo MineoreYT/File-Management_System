@@ -32,8 +32,31 @@ const Register = () => {
       return false;
     }
     
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters long');
+    // Updated password validation to match backend requirements
+    if (formData.password.length < 8) {
+      setError('Password must be at least 8 characters long');
+      return false;
+    }
+
+    const hasUpperCase = /[A-Z]/.test(formData.password);
+    const hasLowerCase = /[a-z]/.test(formData.password);
+    const hasNumbers = /\d/.test(formData.password);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(formData.password);
+
+    if (!hasUpperCase) {
+      setError('Password must contain at least one uppercase letter');
+      return false;
+    }
+    if (!hasLowerCase) {
+      setError('Password must contain at least one lowercase letter');
+      return false;
+    }
+    if (!hasNumbers) {
+      setError('Password must contain at least one number');
+      return false;
+    }
+    if (!hasSpecialChar) {
+      setError('Password must contain at least one special character (!@#$%^&*(),.?":{}|<>)');
       return false;
     }
 
@@ -43,8 +66,14 @@ const Register = () => {
       return false;
     }
 
-    if (formData.username.length < 3) {
-      setError('Username must be at least 3 characters long');
+    if (formData.username.length < 3 || formData.username.length > 20) {
+      setError('Username must be 3-20 characters long');
+      return false;
+    }
+
+    // Check if username contains only alphanumeric characters
+    if (!/^[a-zA-Z0-9]+$/.test(formData.username)) {
+      setError('Username must contain only letters and numbers');
       return false;
     }
 
@@ -160,6 +189,16 @@ const Register = () => {
                     <Eye className="h-4 w-4 text-gray-400" />
                   )}
                 </button>
+              </div>
+              <div className="mt-2 text-xs text-gray-600">
+                <p className="font-medium">Password must contain:</p>
+                <ul className="list-disc list-inside space-y-1 mt-1">
+                  <li>At least 8 characters</li>
+                  <li>One uppercase letter (A-Z)</li>
+                  <li>One lowercase letter (a-z)</li>
+                  <li>One number (0-9)</li>
+                  <li>One special character (!@#$%^&*(),.?":{}|&lt;&gt;)</li>
+                </ul>
               </div>
             </div>
 

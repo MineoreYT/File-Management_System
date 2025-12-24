@@ -58,10 +58,7 @@ export const foldersAPI = {
 
 // Files API
 export const filesAPI = {
-  getFiles: (params = {}) => {
-    console.log('filesAPI.getFiles called with params:', params);
-    return api.get('/files', { params });
-  },
+  getFiles: (params = {}) => api.get('/files', { params }),
   uploadFiles: (formData, onUploadProgress) => {
     return api.post('/files/upload', formData, {
       headers: {

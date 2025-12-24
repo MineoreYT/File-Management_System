@@ -1,9 +1,11 @@
 import { useState, useRef } from 'react';
 import { Upload, X, File, AlertCircle } from 'lucide-react';
-import { filesAPI } from '../services/api';
+import { filesAPI, authAPI } from '../services/api';
 import { formatFileSize } from '../utils/helpers';
+import { useAuth } from '../context/AuthContext';
 
 const FileUpload = ({ currentFolderId, onUploadComplete, onClose }) => {
+  const { updateUser } = useAuth();
   const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({});
@@ -70,6 +72,14 @@ const FileUpload = ({ currentFolderId, onUploadComplete, onClose }) => {
       });
 
       if (response.data) {
+        // Refresh user profile to get updated storage usage
+        try {
+          const profileResponse = await authAPI.getProfile();
+          updateUser(profileResponse.data.user);
+        } catch (profileError) {
+          console.error('Error refreshing user profile:', profileError);
+        }
+
         onUploadComplete(response.data.files);
         setFiles([]);
         onClose();

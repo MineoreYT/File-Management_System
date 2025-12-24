@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { filesAPI, foldersAPI } from '../services/api';
+import { filesAPI, foldersAPI, authAPI } from '../services/api';
 import { downloadFile, sortItems } from '../utils/helpers';
 import SideBar from '../components/SideBar';
 import BreadCrumb from '../components/BreadCrumb';
@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 
 const FileManager = () => {
+  const { updateUser } = useAuth();
   const [files, setFiles] = useState([]);
   const [folders, setFolders] = useState([]);
   const [allFolders, setAllFolders] = useState([]);
@@ -104,6 +105,15 @@ const FileManager = () => {
         case 'delete':
           if (window.confirm(`Are you sure you want to delete "${file.original_name}"?`)) {
             await filesAPI.deleteFile(file.id);
+            
+            // Refresh user profile to get updated storage usage
+            try {
+              const profileResponse = await authAPI.getProfile();
+              updateUser(profileResponse.data.user);
+            } catch (profileError) {
+              console.error('Error refreshing user profile:', profileError);
+            }
+            
             fetchData();
           }
           break;

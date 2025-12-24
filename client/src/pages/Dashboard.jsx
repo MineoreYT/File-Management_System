@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { filesAPI, foldersAPI } from '../services/api';
+import { filesAPI, foldersAPI, authAPI } from '../services/api';
 import { formatFileSize } from '../utils/helpers';
 import SideBar from '../components/SideBar';
 import { 
@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 const Dashboard = () => {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalFiles: 0,
@@ -31,13 +31,18 @@ const Dashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      const [filesResponse, foldersResponse] = await Promise.all([
+      const [filesResponse, foldersResponse, profileResponse] = await Promise.all([
         filesAPI.getFiles(),
-        foldersAPI.getFolders()
+        foldersAPI.getFolders(),
+        authAPI.getProfile()
       ]);
 
       const files = filesResponse.data.files;
       const folders = foldersResponse.data.folders;
+      const updatedUser = profileResponse.data.user;
+
+      // Update user context with fresh data
+      updateUser(updatedUser);
 
       // Get recent files (last 5)
       const recentFiles = files
@@ -47,7 +52,7 @@ const Dashboard = () => {
       setStats({
         totalFiles: files.length,
         totalFolders: folders.length,
-        storageUsed: user.storage_used,
+        storageUsed: updatedUser.storage_used,
         recentFiles
       });
     } catch (error) {

@@ -34,6 +34,8 @@ const storage = multer.diskStorage({
 
 // Enhanced file filter with security validation
 const fileFilter = (req, file, cb) => {
+    console.log('File validation - Name:', file.originalname, 'MIME:', file.mimetype);
+    
     // Define allowed file types (whitelist approach)
     const allowedMimeTypes = [
         // Images
@@ -66,14 +68,30 @@ const fileFilter = (req, file, cb) => {
     const isMimeTypeAllowed = allowedMimeTypes.includes(file.mimetype);
     const isExtensionAllowed = allowedExtensions.includes(fileExtension);
     
-    // Additional security checks
-    const hasValidName = /^[a-zA-Z0-9._-]+$/.test(path.basename(file.originalname, fileExtension));
+    // More permissive filename validation - allow common characters but block dangerous ones
+    const filename = path.basename(file.originalname, fileExtension);
+    const hasDangerousChars = /[<>:"/\\|?*\x00-\x1f]/.test(filename); // Block dangerous filesystem chars
     const isNotExecutable = !['.exe', '.bat', '.cmd', '.com', '.scr', '.vbs', '.js', '.jar', '.app', '.deb', '.rpm'].includes(fileExtension);
     
-    if (isMimeTypeAllowed && isExtensionAllowed && hasValidName && isNotExecutable) {
+    console.log('Validation results:', {
+        isMimeTypeAllowed,
+        isExtensionAllowed,
+        hasDangerousChars,
+        isNotExecutable,
+        filename
+    });
+    
+    if (isMimeTypeAllowed && isExtensionAllowed && !hasDangerousChars && isNotExecutable) {
         cb(null, true);
     } else {
-        const error = new Error(`File type not allowed. Allowed types: ${allowedExtensions.join(', ')}`);
+        let errorMessage = 'File upload rejected: ';
+        if (!isMimeTypeAllowed) errorMessage += `MIME type '${file.mimetype}' not allowed. `;
+        if (!isExtensionAllowed) errorMessage += `Extension '${fileExtension}' not allowed. `;
+        if (hasDangerousChars) errorMessage += `Filename contains dangerous characters. `;
+        if (!isNotExecutable) errorMessage += `Executable files not allowed. `;
+        errorMessage += `Allowed types: ${allowedExtensions.join(', ')}`;
+        
+        const error = new Error(errorMessage);
         error.code = 'INVALID_FILE_TYPE';
         cb(error, false);
     }

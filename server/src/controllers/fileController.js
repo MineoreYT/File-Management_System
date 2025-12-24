@@ -105,6 +105,8 @@ const getFiles = (req, res) => {
     const sortBy = req.query.sortBy || 'name';
     const sortOrder = req.query.sortOrder || 'ASC';
 
+    console.log('getFiles called with params:', { userId, folderId, getAllFiles, search, sortBy, sortOrder });
+
     // Validate and sanitize inputs
     if (folderId && !validator.isInt(String(folderId), { min: 1 })) {
         return res.status(400).json({ error: 'Invalid folder ID' });
@@ -143,11 +145,15 @@ const getFiles = (req, res) => {
     // Add sorting with validated parameters
     query += ` ORDER BY ${safeSortBy} ${safeSortOrder}`;
 
+    console.log('Executing query:', query, 'with params:', params);
+
     db.all(query, params, (err, files) => {
         if (err) {
+            console.error('Database error in getFiles:', err);
             return res.status(500).json({ error: 'Database error' });
         }
 
+        console.log(`Found ${files.length} files for user ${userId}`);
         res.json({ files });
     });
 };

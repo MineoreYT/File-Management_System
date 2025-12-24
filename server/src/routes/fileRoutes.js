@@ -16,7 +16,15 @@ const router = express.Router();
 // All file routes require authentication
 router.use(authenticateToken);
 
-router.post('/upload', upload.array('files', 10), checkStorageQuota, uploadFiles);
+// Upload route with proper middleware order
+router.post('/upload', (req, res, next) => {
+    // Ensure user is authenticated before multer processes
+    if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+    }
+    next();
+}, upload.array('files', 10), checkStorageQuota, uploadFiles);
+
 router.get('/', getFiles);
 router.get('/:id/download', downloadFile);
 router.get('/:id/preview', getFilePreview);

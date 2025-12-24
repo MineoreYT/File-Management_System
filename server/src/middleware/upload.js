@@ -11,6 +11,11 @@ if (!fs.existsSync(uploadsDir)) {
 // Configure multer for file uploads
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
+        // Check if user is authenticated (req.user should be available)
+        if (!req.user || !req.user.id) {
+            return cb(new Error('User authentication required for file upload'), null);
+        }
+        
         // Create user-specific directory
         const userDir = path.join(uploadsDir, req.user.id.toString());
         if (!fs.existsSync(userDir)) {

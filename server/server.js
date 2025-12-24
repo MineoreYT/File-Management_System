@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const multer = require('multer');
 const path = require('path');
 
 // Import routes
@@ -87,16 +88,31 @@ app.get('/api/health', (req, res) => {
 app.use((err, req, res, next) => {
     console.error('Error:', err);
     
+    // Multer errors
     if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(413).json({ error: 'File too large' });
+        return res.status(413).json({ error: 'File too large (max 100MB)' });
     }
     
     if (err.code === 'LIMIT_FILE_COUNT') {
-        return res.status(413).json({ error: 'Too many files' });
+        return res.status(413).json({ error: 'Too many files (max 10 files)' });
     }
     
     if (err.code === 'LIMIT_UNEXPECTED_FILE') {
         return res.status(400).json({ error: 'Unexpected file field' });
+    }
+
+    if (err.code === 'INVALID_FILE_TYPE') {
+        return res.status(400).json({ error: err.message });
+    }
+
+    // Authentication errors
+    if (err.message === 'User authentication required for file upload') {
+        return res.status(401).json({ error: 'Authentication required for file upload' });
+    }
+
+    // Generic multer errors
+    if (err instanceof multer.MulterError) {
+        return res.status(400).json({ error: `Upload error: ${err.message}` });
     }
 
     res.status(500).json({ 

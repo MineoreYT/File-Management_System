@@ -46,7 +46,10 @@ export const authAPI = {
 
 // Folders API
 export const foldersAPI = {
-  getFolders: (parentId = null) => api.get('/folders', { params: { parentId } }),
+  getFolders: (parentId = null, options = {}) => {
+    const params = { parentId, ...options };
+    return api.get('/folders', { params });
+  },
   getFolderTree: () => api.get('/folders/tree'),
   createFolder: (folderData) => api.post('/folders', folderData),
   renameFolder: (id, name) => api.put(`/folders/${id}`, { name }),

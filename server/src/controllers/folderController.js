@@ -86,17 +86,21 @@ const insertFolder = (name, parentId, userId, folderPath, res) => {
 const getFolders = (req, res) => {
     const userId = req.user.id;
     const parentId = req.query.parentId || null;
+    const getAllFolders = req.query.all === 'true'; // New parameter to get all folders
 
     const db = database.getDb();
     
     let query = 'SELECT * FROM folders WHERE user_id = ?';
     let params = [userId];
 
-    if (parentId) {
-        query += ' AND parent_id = ?';
-        params.push(parentId);
-    } else {
-        query += ' AND parent_id IS NULL';
+    // Only filter by parent if not getting all folders
+    if (!getAllFolders) {
+        if (parentId) {
+            query += ' AND parent_id = ?';
+            params.push(parentId);
+        } else {
+            query += ' AND parent_id IS NULL';
+        }
     }
 
     query += ' ORDER BY name ASC';

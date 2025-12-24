@@ -100,6 +100,7 @@ const processFileUploads = (files, userId, folderId, res) => {
 const getFiles = (req, res) => {
     const userId = req.user.id;
     const folderId = req.query.folderId || null;
+    const getAllFiles = req.query.all === 'true'; // New parameter to get all files
     const search = req.query.search;
     const sortBy = req.query.sortBy || 'name';
     const sortOrder = req.query.sortOrder || 'ASC';
@@ -124,11 +125,14 @@ const getFiles = (req, res) => {
     let query = 'SELECT * FROM files WHERE user_id = ?';
     let params = [userId];
 
-    if (folderId) {
-        query += ' AND folder_id = ?';
-        params.push(folderId);
-    } else {
-        query += ' AND folder_id IS NULL';
+    // Only filter by folder if not getting all files
+    if (!getAllFiles) {
+        if (folderId) {
+            query += ' AND folder_id = ?';
+            params.push(folderId);
+        } else {
+            query += ' AND folder_id IS NULL';
+        }
     }
 
     if (sanitizedSearch) {

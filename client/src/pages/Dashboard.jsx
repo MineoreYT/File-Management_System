@@ -31,15 +31,29 @@ const Dashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
+      console.log('Fetching dashboard data...');
+      
       const [filesResponse, foldersResponse, profileResponse] = await Promise.all([
-        filesAPI.getFiles(),
-        foldersAPI.getFolders(),
+        filesAPI.getFiles({ all: 'true' }), // Get all files for the user
+        foldersAPI.getFolders(null, { all: 'true' }), // Get all folders for the user
         authAPI.getProfile()
       ]);
+
+      console.log('API Responses:', {
+        files: filesResponse.data,
+        folders: foldersResponse.data,
+        profile: profileResponse.data
+      });
 
       const files = filesResponse.data.files;
       const folders = foldersResponse.data.folders;
       const updatedUser = profileResponse.data.user;
+
+      console.log('Processed data:', {
+        filesCount: files.length,
+        foldersCount: folders.length,
+        storageUsed: updatedUser.storage_used
+      });
 
       // Update user context with fresh data
       updateUser(updatedUser);

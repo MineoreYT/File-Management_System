@@ -302,7 +302,7 @@ This project is licensed under the ISC License.
 
 **MineoreYT**
 - GitHub: [@MineoreYT](https://github.com/MineoreYT)
-- Email: mineoreyt@gmail.com
+- Email: jesukoanateno@gmail.com
 
 ## 🙏 Acknowledgments
 
